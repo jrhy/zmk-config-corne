@@ -70,6 +70,17 @@
                 <&kp LCTRL>;
         };
 
+        ui_lgui: ui_lgui {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            bindings =
+                <&macro_press>,
+                <&kp LGUI>,
+                <&macro_pause_for_release>,
+                <&macro_release>,
+                <&kp LGUI>;
+        };
+
     };
 
     combos {
@@ -163,6 +174,11 @@
         para-great {
             bindings = <&paragreat>;
             key-positions = <20 21>;
+        };
+
+        ui-lgui {
+            bindings = <&ui_lgui>;
+            key-positions = <7 8>;
         };
     };
 
