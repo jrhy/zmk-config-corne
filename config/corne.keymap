@@ -80,11 +80,6 @@
             key-positions = <13 29>;
         };
 
-        delete {
-            bindings = <&kp DELETE>;
-            key-positions = <15 21>;
-        };
-
         perc {
             bindings = <&kp PERCENT>;
             key-positions = <5 17>;
