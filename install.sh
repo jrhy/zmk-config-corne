@@ -7,6 +7,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${TMPDIR:-/tmp}/zmk-corne-install"
+
+# Clean up previous run and create fresh work directory
+rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 
 # Tool URLs and checksums - pinned to specific commit for stability
@@ -61,6 +64,9 @@ download_firmware() {
 
     log "Downloading latest firmware from $repo ($branch)..."
 
+    # Clean up any previous firmware downloads
+    rm -rf "$WORK_DIR/firmware"
+
     # Get latest successful run on the specified branch
     local run_id=$(gh run list -R "$repo" --branch "$branch" --status success --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
 
@@ -70,6 +76,12 @@ download_firmware() {
 
     log "Using build run: $run_id"
     gh run download "$run_id" -R "$repo" -D "$WORK_DIR/firmware" || error "Failed to download firmware"
+
+    # gh downloads to nested firmware/firmware/ directory, flatten if needed
+    if [ -d "$WORK_DIR/firmware/firmware" ]; then
+        mv "$WORK_DIR/firmware/firmware"/* "$WORK_DIR/firmware/" 2>/dev/null || true
+        rmdir "$WORK_DIR/firmware/firmware" 2>/dev/null || true
+    fi
 }
 
 flash_half() {
