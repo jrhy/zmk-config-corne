@@ -9,14 +9,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${TMPDIR:-/tmp}/zmk-corne-install"
 mkdir -p "$WORK_DIR"
 
-# Tool URLs and checksums (update these when tools change)
-UF2CONV_URL="https://raw.githubusercontent.com/microsoft/uf2/master/utils/uf2conv.py"
-UF2FAMILIES_URL="https://raw.githubusercontent.com/microsoft/uf2/master/utils/uf2families.json"
+# Tool URLs and checksums - pinned to specific commit for stability
+UF2_COMMIT="2c8dbaf81bfd5455154ba3b019751766effbd6e7"  # Nov 19, 2025
+UF2CONV_URL="https://raw.githubusercontent.com/microsoft/uf2/${UF2_COMMIT}/utils/uf2conv.py"
+UF2FAMILIES_URL="https://raw.githubusercontent.com/microsoft/uf2/${UF2_COMMIT}/utils/uf2families.json"
 
 # SHA256 checksums - verify with: shasum -a 256 filename
-# These should be updated when the upstream tools change
-UF2CONV_SHA256="71b18dd65aeefedf0e25d63e4db3ae3c9b9e91e5bb4228d0cdc42b21dc97b8f1"
-UF2FAMILIES_SHA256="f87b8e62bfccb8c1a5e2aeba83f1d8d4c0a0e7f9e8d7c6b5a4f3e2d1c0b9a8f"
+UF2CONV_SHA256="ad36ba2d61fb2ea371832262392088281eee474c609df4142adbee4ea3c20f26"
+UF2FAMILIES_SHA256="c8a3f8e70eef3db3e46b324e2cc54cd7fdac1b8cf873d37506221ddd77249e32"
 
 log() {
     echo "📱 $1"
