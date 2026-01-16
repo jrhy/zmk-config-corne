@@ -7,9 +7,6 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${TMPDIR:-/tmp}/zmk-corne-install"
-
-# Clean up previous run and create fresh work directory
-rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 
 # Tool URLs and checksums - pinned to specific commit for stability
@@ -34,38 +31,50 @@ verify_checksum() {
     local file=$1
     local expected=$2
     local name=$3
+    local quiet=${4:-false}
 
     if ! command -v shasum &> /dev/null; then
-        log "⚠️  shasum not found, skipping checksum verification for $name"
+        [ "$quiet" != "true" ] && log "⚠️  shasum not found, skipping checksum verification for $name"
         return 0
     fi
 
+    [ ! -f "$file" ] && return 1
+
     local actual=$(shasum -a 256 "$file" | awk '{print $1}')
     if [ "$actual" != "$expected" ]; then
-        error "Checksum mismatch for $name!\nExpected: $expected\nActual: $actual"
+        [ "$quiet" != "true" ] && error "Checksum mismatch for $name!\nExpected: $expected\nActual: $actual"
+        return 1
     fi
-    log "✅ Checksum verified for $name"
+    [ "$quiet" != "true" ] && log "✅ Checksum verified for $name"
+    return 0
 }
 
 download_tools() {
-    log "Downloading uf2conv.py..."
-    curl -sL -o "$WORK_DIR/uf2conv.py" "$UF2CONV_URL" || error "Failed to download uf2conv.py"
-    chmod +x "$WORK_DIR/uf2conv.py"
-    verify_checksum "$WORK_DIR/uf2conv.py" "$UF2CONV_SHA256" "uf2conv.py"
+    # Check if uf2conv.py already exists with correct checksum
+    if verify_checksum "$WORK_DIR/uf2conv.py" "$UF2CONV_SHA256" "uf2conv.py" true; then
+        log "✅ uf2conv.py already cached"
+    else
+        log "Downloading uf2conv.py..."
+        curl -sL -o "$WORK_DIR/uf2conv.py" "$UF2CONV_URL" || error "Failed to download uf2conv.py"
+        chmod +x "$WORK_DIR/uf2conv.py"
+        verify_checksum "$WORK_DIR/uf2conv.py" "$UF2CONV_SHA256" "uf2conv.py"
+    fi
 
-    log "Downloading uf2families.json..."
-    curl -sL -o "$WORK_DIR/uf2families.json" "$UF2FAMILIES_URL" || error "Failed to download uf2families.json"
-    verify_checksum "$WORK_DIR/uf2families.json" "$UF2FAMILIES_SHA256" "uf2families.json"
+    # Check if uf2families.json already exists with correct checksum
+    if verify_checksum "$WORK_DIR/uf2families.json" "$UF2FAMILIES_SHA256" "uf2families.json" true; then
+        log "✅ uf2families.json already cached"
+    else
+        log "Downloading uf2families.json..."
+        curl -sL -o "$WORK_DIR/uf2families.json" "$UF2FAMILIES_URL" || error "Failed to download uf2families.json"
+        verify_checksum "$WORK_DIR/uf2families.json" "$UF2FAMILIES_SHA256" "uf2families.json"
+    fi
 }
 
 download_firmware() {
     local repo="${1:-jrhy/zmk-config-corne}"
     local branch="${2:-main}"
 
-    log "Downloading latest firmware from $repo ($branch)..."
-
-    # Clean up any previous firmware downloads
-    rm -rf "$WORK_DIR/firmware"
+    log "Checking for latest firmware from $repo ($branch)..."
 
     # Get latest successful run on the specified branch
     local run_id=$(gh run list -R "$repo" --branch "$branch" --status success --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
@@ -74,7 +83,20 @@ download_firmware() {
         error "No successful builds found for $repo on branch $branch. Check GitHub Actions."
     fi
 
-    log "Using build run: $run_id"
+    # Check if we already have this run cached
+    local cached_run_id=""
+    [ -f "$WORK_DIR/firmware/.run_id" ] && cached_run_id=$(cat "$WORK_DIR/firmware/.run_id")
+
+    if [ "$run_id" = "$cached_run_id" ] && [ -f "$WORK_DIR/firmware/corne_left-nice_nano@2.0.0-zmk.uf2" ]; then
+        log "✅ Firmware already cached (run $run_id)"
+        return 0
+    fi
+
+    log "Downloading firmware (run $run_id)..."
+
+    # Clean up any previous firmware downloads
+    rm -rf "$WORK_DIR/firmware"
+
     gh run download "$run_id" -R "$repo" -D "$WORK_DIR/firmware" || error "Failed to download firmware"
 
     # gh downloads to nested firmware/firmware/ directory, flatten if needed
@@ -82,6 +104,9 @@ download_firmware() {
         mv "$WORK_DIR/firmware/firmware"/* "$WORK_DIR/firmware/" 2>/dev/null || true
         rmdir "$WORK_DIR/firmware/firmware" 2>/dev/null || true
     fi
+
+    # Cache the run_id
+    echo "$run_id" > "$WORK_DIR/firmware/.run_id"
 }
 
 flash_half() {
